@@ -1,0 +1,65 @@
+【実行時の処理順序】
+
+1. WinMain 関数の呼び出し
+・アプリケーションのエントリーポイントである WinMain 関数から実行が始まります
+・WNDCLASSEX 構造体を使用してウィンドウクラスを登録し、ウィンドウの設定と作成を行います
+・作成したウィンドウを表示(ShowWindow)します
+
+
+2. MiniDirectX11 クラスのインスタンス化
+・MiniDirectX11 dxApp(hwnd); により MiniDirectX11 クラスのコンストラクタが呼び出され、以下の処理が行われます
+・MiniDirectX11::MiniDirectX11(HWND hwnd)
+・InitD3D(hwnd)
+  - Direct3D の初期化を行います
+  - スワップチェーンとデバイス、デバイスコンテキストを作成します(D3D11CreateDeviceAndSwapChain)
+  - バックバッファからレンダーターゲットビューを作成し、出力マージャーに設定します(CreateRenderTargetView、OMSetRenderTargets)
+  - ビューポートの設定を行い、ラスタライザーに設定します(RSSetViewports)
+・CompileShaders()
+  - シェーダーファイルd(頂点シェーダー、ハルシェーダー、ドメインシェーダー、ジオメトリシェーダー、ピクセルシェーダー)のコンパイルと作成を行います
+  - D3DCompileFromFile で各シェーダーファイルをコンパイルし、対応する Direct3D シェーダーオブジェクトを作成します(CreateVertexShader など)
+  - 頂点シェーダーの入力レイアウトも作成します(CreateInputLayout)
+・CreateVertexBuffer()
+  - 三角形の頂点データを定義し、頂点バッファを作成します(CreateBuffer)
+
+
+3. メッセージループ
+・while(msg.message != WM_QUIT)のループが始まり、ウィンドウメッセージを処理します
+・PeekMessage でメッセージキューからメッセージを取得し、それを TranslateMessage、DispatchMessage で処理します
+・メッセージが存在しない場合、フレームの描画(dxApp.RenderFrame())を行います
+
+
+4. MiniDirectX11::RenderFrame()
+・ 1 フレーム分のレンダリングを行います
+・描画処理の手順
+  1. レンダーターゲットビューのクリア
+     ・背景色d(黒)でレンダーターゲットをクリアします(ClearRenderTargetView)
+  2. 入力アセンブラ(Input Assembler)の設定
+     ・入力レイアウトを設定します(IASetInputLayout)
+     ・頂点バッファを設定します(IASetVertexBuffers)
+     ・プリミティブトポロジd(三角形リスト)を設定します(IASetPrimitiveTopology)
+  3. シェーダーの設定
+     ・頂点シェーダー(VSSetShader)とピクセルシェーダー(PSSetShader)を設定します
+     ・ハルシェーダー、ドメインシェーダー、ジオメトリシェーダーは今回は使わないため、nullptr を設定しています
+  4. 描画コール
+     ・3つの頂点を用いて三角形を描画します(Draw(3, 0))
+  5. スワップチェーンのバッファを交換
+     ・スワップチェーンを使ってバックバッファとフロントバッファを入れ替え、画面に描画内容を表示します(swapChain->Present(0, 0))
+
+
+5. ウィンドウが閉じられたとき
+・ ウィンドウメッセージが WM_QUIT になるとループを抜けてプログラムを終了します
+・MiniDirectX11 のデストラクタが呼び出されます
+
+6. MiniDirectX11::~MiniDirectX11()
+・CleanD3D()
+  - Direct3D のリソースをクリーンアップします
+  - ComPtr を使用しているため、各リソースd(デバイス、コンテキスト、スワップチェーンなど)は自動的に解放されます
+
+
+
+【処理の順序まとめ】
+1. WinMain 関数の呼び出し
+2. MiniDirectX11 のインスタンス化d(InitD3D → CompileShaders → CreateVertexBuffer)
+3. メッセージループd(RenderFrame の呼び出し)
+4. RenderFrame の描画処理d(クリア → 入力設定 → シェーダー設定 → 描画 → バッファ交換)
+5. ウィンドウが閉じられたときd(~MiniDirectX11 の呼び出し → CleanD3D)
